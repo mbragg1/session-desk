@@ -164,7 +164,7 @@ async function launch(indexed, run, { fresh }) {
     SESSION_DESK_BENCH: '1'
   }
   const t0 = Date.now()
-  const proc = spawn(ELECTRON, [APP, `--remote-debugging-port=${PORT}`, ...THROTTLE_OFF], { env, stdio: ['ignore', 'ignore', 'pipe'] })
+  const proc = spawn(ELECTRON, [...(process.env.BENCH_MAIN_PROFILE ? ['--inspect=9339'] : []), APP, `--remote-debugging-port=${PORT}`, ...THROTTLE_OFF], { env, stdio: ['ignore', 'ignore', 'pipe'] })
   let stderr = ''
   proc.stderr.on('data', (d) => (stderr += d))
   const cdp = await Cdp.connect()
@@ -263,7 +263,8 @@ async function main() {
     config: { indexed: INDEXED, open: OPEN, ratePerSession: RATE, windowS: WINDOW_S, idleS: IDLE_S },
     startup: [],
     idle: {},
-    streaming: {}
+    streaming: {},
+    switching: {}
   }
   for (const indexed of INDEXED) {
     // Startup: one launch on a fresh data folder, two warm ones.
@@ -306,14 +307,16 @@ async function main() {
       // Streaming: open sessions one by one (each resumes and streams); the last one is on screen.
       let opened = 0
       const baseRss = rss(b)
+      // By session id: the sidebar re-sorts as sessions get activity, so row positions move.
+      const sids = await app.cdp.eval(`[...document.querySelectorAll('.row-more[data-sid]')].map((b) => b.dataset.sid)`)
+      const clickSession = (id) => `document.querySelector('.row-more[data-sid="${id}"]').closest('.session-row').click()`
       for (const open of OPEN) {
-        const ids = await app.cdp.eval(`document.querySelectorAll('.session-row').length`)
-        if (open > ids) break
+        if (open > sids.length) break
         for (; opened < open; opened++) {
-          await app.cdp.eval(`document.querySelectorAll('.session-row')[${opened}].click()`)
+          await app.cdp.eval(clickSession(sids[opened]))
           await sleep(open > 10 ? 80 : 150)
         }
-        await sleep(3000)
+        await sleep(3000 + Number(args.settle ?? 0) * 1000)
         if (process.env.BENCH_DEBUG) {
           const shot = await app.cdp.send('Page.captureScreenshot', { format: 'png' })
           writeFileSync(join(ROOT, `shot-${LABEL}-${open}.png`), Buffer.from(shot.data, 'base64'))
@@ -328,8 +331,27 @@ async function main() {
         }, 1000)
         await app.cdp.send('Page.bringToFront').catch(() => {})
         await app.cdp.eval(OBSERVE)
+        let mainCdp = null
+        if (process.env.BENCH_MAIN_PROFILE) {
+          const [t] = await (await fetch('http://127.0.0.1:9339/json/list')).json()
+          mainCdp = await new Cdp(t.webSocketDebuggerUrl).ready
+          await mainCdp.send('Profiler.enable')
+          await mainCdp.send('Profiler.start')
+        }
         const a2 = processes(app.proc.pid)
         await sleep(WINDOW_S * 1000)
+        if (mainCdp) {
+          const { profile } = await mainCdp.send('Profiler.stop')
+          const self = new Map()
+          const byId = new Map(profile.nodes.map((n) => [n.id, n]))
+          profile.samples.forEach((id, i) => {
+            const n = byId.get(id).callFrame
+            const k = `${n.functionName || '(anon)'} ${n.url.split('/').pop()}:${n.lineNumber}`
+            self.set(k, (self.get(k) ?? 0) + (profile.timeDeltas[i] ?? 0) / 1000)
+          })
+          console.log('main profile (self ms):', JSON.stringify([...self].sort((x, y) => y[1] - x[1]).slice(0, 15)))
+          mainCdp.close()
+        }
         const b2 = processes(app.proc.pid)
         clearInterval(appender)
         const c = await app.cdp.eval(COLLECT)
@@ -343,6 +365,37 @@ async function main() {
           ...frameStats(c)
         }
         console.log('streaming', indexed, open, results.streaming[`${indexed}x${open}`])
+      }
+      // Switching back: to the first session opened (longest unviewed) and to a recently viewed one.
+      if (opened > 2) {
+        const switchTo = (i) =>
+          app.cdp.eval(`new Promise((done) => {
+            const t0 = performance.now()
+            ${clickSession(sids[i])}
+            const check = () => {
+              const host = [...document.querySelectorAll('.term-host')].find((h) => h.style.display !== 'none')
+              const text = host?.querySelector('.xterm-rows')?.textContent ?? ''
+              if (text.trim().length > 0) done(performance.now() - t0)
+              else requestAnimationFrame(check)
+            }
+            requestAnimationFrame(check)
+          })`)
+        const oldest = []
+        const recent = []
+        for (let k = 0; k < 3; k++) {
+          oldest.push(await switchTo(k))
+          await sleep(500)
+          recent.push(await switchTo(opened - 2 - k))
+          await sleep(500)
+        }
+        if (process.env.BENCH_DEBUG) {
+          await switchTo(0)
+          await sleep(300)
+          const shot = await app.cdp.send('Page.captureScreenshot', { format: 'png' })
+          writeFileSync(join(ROOT, `switch-${LABEL}.png`), Buffer.from(shot.data, 'base64'))
+        }
+        results.switching[indexed] = { opened, toLongUnviewedMs: r2(pct(oldest, 50)), toRecentMs: r2(pct(recent, 50)), loadedTerminals: await app.cdp.eval(`document.querySelectorAll('.term-host').length`) }
+        console.log('switching', indexed, results.switching[indexed])
       }
       await quit(app)
     }

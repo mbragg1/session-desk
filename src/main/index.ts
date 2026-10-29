@@ -795,7 +795,10 @@ ipcMain.on('ui:active', (_e, id: string | null) => {
 })
 ipcMain.on('ui:visibleTerminal', (_e, id: string | null) => {
   visibleTerminalId = typeof id === 'string' && UUID_RE.test(id) ? id : null
+  // The newly shown terminal draws its latest output at once.
+  ptyOutput.flush()
 })
+ipcMain.handle('pty:replay', (_e, id: unknown) => (typeof id === 'string' && UUID_RE.test(id) ? ptys.replay(id) : ''))
 
 app.on('second-instance', () => showWindow())
 

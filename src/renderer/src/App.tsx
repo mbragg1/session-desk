@@ -33,6 +33,28 @@ interface OpenTerm {
   /** Bumped to remount (restart) a terminal after its process exits. */
   gen: number
   exited: boolean
+  exitCode?: number
+  /** When it was opened or restarted: its terminal stays loaded a while so the process starts and settles. */
+  addedAt: number
+}
+
+// Terminals kept loaded besides the one on screen: the most recently viewed.
+// The others are unloaded (their process keeps running; main keeps their
+// latest output) and redrawn from that output when shown again. Each loaded
+// terminal holds its scrollback and parses its session's output.
+const LIVE_TERMINALS = 8
+/** A newly started terminal stays loaded this long, so the program's start-up exchanges with it complete. */
+const START_GRACE_MS = 30_000
+
+/** The terminals to keep loaded: the one on screen, the most recently viewed, and any just started. */
+export function loadedTerminals<T extends { id: string; addedAt: number }>(
+  terms: T[],
+  activeId: string | null,
+  recent: string[],
+  now: number
+): T[] {
+  const keep = new Set(recent.slice(0, LIVE_TERMINALS))
+  return terms.filter((t) => t.id === activeId || keep.has(t.id) || now - t.addedAt < START_GRACE_MS)
 }
 
 export function App() {
@@ -107,8 +129,8 @@ export function App() {
     }
   }, [scanned, pending])
 
-  const openTerm = useCallback((t: Omit<OpenTerm, 'gen' | 'exited'>) => {
-    setTerms((ts) => (ts.some((x) => x.id === t.id) ? ts : [...ts, { ...t, gen: 0, exited: false }]))
+  const openTerm = useCallback((t: Omit<OpenTerm, 'gen' | 'exited' | 'addedAt'>) => {
+    setTerms((ts) => (ts.some((x) => x.id === t.id) ? ts : [...ts, { ...t, gen: 0, addedAt: Date.now(), exited: false }]))
   }, [])
 
   // An unused draft has no transcript and so no sidebar entry. Reuse it rather
@@ -271,8 +293,8 @@ export function App() {
     // An exited terminal is remounted with the turn; otherwise a fresh one opens.
     setTerms((ts) =>
       ts.some((t) => t.id === s.id)
-        ? ts.map((t) => (t.id === s.id ? { ...t, ...term, gen: t.gen + 1, exited: false } : t))
-        : [...ts, { ...term, gen: 0, exited: false }]
+        ? ts.map((t) => (t.id === s.id ? { ...t, ...term, gen: t.gen + 1, addedAt: Date.now(), exited: false } : t))
+        : [...ts, { ...term, gen: 0, addedAt: Date.now(), exited: false }]
     )
   }
 
@@ -338,6 +360,21 @@ export function App() {
   const activeTerm = terms.find((t) => t.id === activeTermId)
   useEffect(() => window.desk.setVisibleTerminal(activeTermId), [activeTermId])
 
+  // Most recently viewed first.
+  const [recentTerms, setRecentTerms] = useState<string[]>([])
+  useEffect(() => {
+    if (activeTermId) setRecentTerms((r) => [activeTermId, ...r.filter((id) => id !== activeTermId)].slice(0, 4 * LIVE_TERMINALS))
+  }, [activeTermId])
+  // Re-render when a new terminal's start-up grace ends, so it can be unloaded.
+  const [, setGraceTick] = useState(0)
+  useEffect(() => {
+    const ends = terms.map((t) => t.addedAt + START_GRACE_MS - Date.now()).filter((ms) => ms > 0)
+    if (!ends.length) return
+    const timer = setTimeout(() => setGraceTick((n) => n + 1), Math.min(...ends) + 50)
+    return () => clearTimeout(timer)
+  }, [terms])
+  const loadedTerms = loadedTerminals(terms, activeTermId, recentTerms, Date.now())
+
   // Model/effort chosen here. The scan reports it for sessions; a new chat has
   // no summary yet, so its choice is kept here (it also shows before the scan catches up).
   const [launchChoice, setLaunchChoice] = useState<Record<string, SessionLaunch>>({})
@@ -387,7 +424,7 @@ export function App() {
       if (runningIds.has(id)) await window.desk.ptyStop(id)
       const resume = scanned.some((s) => s.id === id)
       setTerms((ts) =>
-        ts.map((t) => (t.id === id ? { ...t, resume, kickoff: undefined, prBranch: undefined, gen: t.gen + 1, exited: false } : t))
+        ts.map((t) => (t.id === id ? { ...t, resume, kickoff: undefined, prBranch: undefined, gen: t.gen + 1, addedAt: Date.now(), exited: false } : t))
       )
       notify(resume ? 'Restarting this session with the new setting' : 'Applied to this new chat')
     } catch (e) {
@@ -405,21 +442,28 @@ export function App() {
     setTerms((ts) =>
       ts.map((t) =>
         ids.includes(t.id)
-          ? { ...t, resume: scanned.some((s) => s.id === t.id), kickoff: undefined, prBranch: undefined, gen: t.gen + 1, exited: false }
+          ? { ...t, resume: scanned.some((s) => s.id === t.id), kickoff: undefined, prBranch: undefined, gen: t.gen + 1, addedAt: Date.now(), exited: false }
           : t
       )
     )
     return ids.length
   }
 
-  const markExited = (id: string) => setTerms((ts) => ts.map((t) => (t.id === id ? { ...t, exited: true } : t)))
+  // Exits are tracked here, not by each terminal: an unloaded one isn't listening.
+  useEffect(
+    () =>
+      window.desk.onPtyExit((id, code) =>
+        setTerms((ts) => ts.map((t) => (t.id === id ? { ...t, exited: true, exitCode: code } : t)))
+      ),
+    []
+  )
   const [sidebarWidth, setSidebarWidth] = useSidebarWidth()
 
   // Resume only works once a transcript exists; a session that exited before
   // anything was sent starts over under the same id.
   const restart = (id: string) => {
     const resume = scanned.some((s) => s.id === id)
-    setTerms((ts) => ts.map((t) => (t.id === id ? { ...t, resume, kickoff: undefined, prBranch: undefined, gen: t.gen + 1, exited: false } : t)))
+    setTerms((ts) => ts.map((t) => (t.id === id ? { ...t, resume, kickoff: undefined, prBranch: undefined, gen: t.gen + 1, addedAt: Date.now(), exited: false } : t)))
   }
 
   return (
@@ -540,7 +584,7 @@ export function App() {
           className="term-stack"
           style={{ display: nav.kind === 'session' || (nav.kind === 'new' && defaultCwd) ? 'flex' : 'none' }}
         >
-          {terms.map((t) => (
+          {loadedTerms.map((t) => (
             <Terminal
               key={`${t.id}:${t.gen}`}
               sessionId={t.id}
@@ -551,7 +595,8 @@ export function App() {
               prBranch={t.prBranch}
               visible={t.id === activeTermId}
               fontSize={fontSize}
-              onExit={() => markExited(t.id)}
+              exited={t.exited}
+              exitCode={t.exitCode}
             />
           ))}
           {activeTerm?.exited && (

@@ -18,7 +18,9 @@ interface Props {
   prBranch?: PrBranch
   visible: boolean
   fontSize: number
-  onExit: (code: number) => void
+  /** Its process has exited: the terminal is redrawn from its last output and nothing is started. */
+  exited: boolean
+  exitCode?: number
 }
 
 /** How long the cursor blinks after the last keystroke before it holds steady. */
@@ -35,16 +37,18 @@ export function themeFromCss(): Record<string, string> {
   }
 }
 
+const exitLine = (code: number | undefined) => `\r\n\x1b[2m[claude exited${code === undefined ? '' : ` with code ${code}`}]\x1b[0m\r\n`
+
 /**
- * One live `claude` process. Mounted once and kept mounted (hidden when not
- * active) so switching sessions never restarts or interrupts a running one.
+ * One live `claude` process's terminal. Hidden when not active; App unloads
+ * ones not viewed for a while and mounts them again later. Mounting attaches
+ * to the running process (or starts it), and never restarts one: an exited
+ * session is only redrawn.
  */
-export function Terminal({ sessionId, resume, cwd, ticket, kickoff, prBranch, visible, fontSize, onExit }: Props) {
+export function Terminal({ sessionId, resume, cwd, ticket, kickoff, prBranch, visible, fontSize, exited, exitCode }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const fit = useRef<FitAddon | null>(null)
   const term = useRef<XTerm | null>(null)
-  const exitRef = useRef(onExit)
-  exitRef.current = onExit
   const [dropping, setDropping] = useState(false)
 
   useEffect(() => {
@@ -71,12 +75,19 @@ export function Terminal({ sessionId, resume, cwd, ticket, kickoff, prBranch, vi
     }
 
     const offData = onSessionOutput(sessionId, (data) => xterm.write(data))
-    const offExit = window.desk.onPtyExit((id, code) => {
-      if (id !== sessionId) return
-      xterm.write(`\r\n\x1b[2m[claude exited with code ${code}]\x1b[0m\r\n`)
-      exitRef.current(code)
-    })
+    const offExit = window.desk.onPtyExit((id, code) => id === sessionId && xterm.write(exitLine(code)))
+    // A replay holds the program's old queries (cursor position, colours…);
+    // the terminal answers them as it redraws. Those answers must not reach
+    // the program as typed input.
+    let replaying = false
+    let disposed = false
+    const replay = (text: string, after = '') => {
+      if (disposed || (!text && !after)) return
+      replaying = true
+      xterm.write(text + after, () => (replaying = false))
+    }
     const input = xterm.onData((d) => {
+      if (replaying) return
       window.desk.ptyWrite(sessionId, d)
       blinkAwhile()
     })
@@ -92,10 +103,14 @@ export function Terminal({ sessionId, resume, cwd, ticket, kickoff, prBranch, vi
     blinkAwhile()
     const resize = xterm.onResize(({ cols, rows }) => window.desk.ptyResize(sessionId, cols, rows))
 
-    window.desk
-      .ptyStart({ sessionId, resume, cwd, ticket, kickoff, prBranch, cols: xterm.cols, rows: xterm.rows })
-      .then((replay) => replay && xterm.write(replay))
-      .catch((err) => xterm.write(`\x1b[31mFailed to start claude: ${String(err)}\x1b[0m\r\n`))
+    if (exited) {
+      void window.desk.ptyReplay(sessionId).then((text) => replay(text, exitLine(exitCode)))
+    } else {
+      window.desk
+        .ptyStart({ sessionId, resume, cwd, ticket, kickoff, prBranch, cols: xterm.cols, rows: xterm.rows })
+        .then((text) => replay(text))
+        .catch((err) => !disposed && xterm.write(`\x1b[31mFailed to start claude: ${String(err)}\x1b[0m\r\n`))
+    }
 
     const scheme = window.matchMedia('(prefers-color-scheme: dark)')
     const retheme = () => (xterm.options.theme = themeFromCss())
@@ -113,6 +128,7 @@ export function Terminal({ sessionId, resume, cwd, ticket, kickoff, prBranch, vi
     ro.observe(host.current!)
 
     return () => {
+      disposed = true
       clearTimeout(blinkTimer)
       offBench()
       ro.disconnect()

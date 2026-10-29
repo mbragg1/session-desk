@@ -1,0 +1,119 @@
+{
+  "label": "SSA2",
+  "at": "2026-10-29T20:25:36.284Z",
+  "machine": {
+    "cpu": "Apple M4",
+    "cores": 10,
+    "memGB": 16,
+    "os": "26.4.1",
+    "electron": "v24.21.0"
+  },
+  "config": {
+    "indexed": [
+      100
+    ],
+    "open": [
+      50
+    ],
+    "ratePerSession": 50,
+    "windowS": 15,
+    "idleS": 2
+  },
+  "startup": [
+    {
+      "indexed": 100,
+      "cold": true,
+      "run": 0,
+      "toNavigationMs": 216.9,
+      "toDomContentLoadedMs": 295.4,
+      "toFirstSidebarRowMs": 550,
+      "toFirstTerminalFrameMs": 357.8,
+      "sidebarRows": 100
+    },
+    {
+      "indexed": 100,
+      "cold": false,
+      "run": 1,
+      "toNavigationMs": 355,
+      "toDomContentLoadedMs": 515.2,
+      "toFirstSidebarRowMs": 564,
+      "toFirstTerminalFrameMs": 582,
+      "sidebarRows": 100
+    },
+    {
+      "indexed": 100,
+      "cold": false,
+      "run": 2,
+      "toNavigationMs": 179.1,
+      "toDomContentLoadedMs": 252.5,
+      "toFirstSidebarRowMs": 293,
+      "toFirstTerminalFrameMs": 290,
+      "sidebarRows": 100
+    }
+  ],
+  "idle": {
+    "100": {
+      "cpuPercent": {
+        "main": 0,
+        "renderer": 0.5,
+        "gpu": 0.5,
+        "utility": 0,
+        "total": 1
+      },
+      "rssMB": {
+        "main": 150.52,
+        "renderer": 131.31,
+        "gpu": 70.75,
+        "utility": 40.48,
+        "total": 393.06
+      },
+      "longAnimationFrames": 0,
+      "terminalRenders": 0,
+      "rendererHeapMB": 11.35
+    }
+  },
+  "streaming": {
+    "100x50": {
+      "indexed": 100,
+      "openStreaming": 50,
+      "cpuPercent": {
+        "main": 9.8,
+        "renderer": 48.27,
+        "gpu": 4.13,
+        "utility": 0,
+        "total": 62.2
+      },
+      "rssMB": {
+        "main": 224.08,
+        "renderer": 554.19,
+        "gpu": 71.81,
+        "utility": 39.77,
+        "total": 889.84
+      },
+      "rssPerOpenTerminalMB": 9.94,
+      "frames": 1805,
+      "fps": 119.97,
+      "frameP50Ms": 8.3,
+      "frameP95Ms": 9.1,
+      "frameP99Ms": 9.3,
+      "framesOver20Ms": 0,
+      "longAnimationFrames": 0,
+      "blockingMs": 0,
+      "latencyParseP50Ms": 6.64,
+      "latencyParseP95Ms": 15.59,
+      "latencyDisplayP50Ms": 9.26,
+      "latencyDisplayP95Ms": 12.97,
+      "latencyDisplayP99Ms": 15.2,
+      "terminalRenders": 752,
+      "rendererHeapMB": 11.35
+    }
+  },
+  "switching": {
+    "100": {
+      "opened": 50,
+      "toLongUnviewedMs": 4.9,
+      "toRecentMs": 5.4,
+      "loadedTerminals": 51
+    }
+  }
+}

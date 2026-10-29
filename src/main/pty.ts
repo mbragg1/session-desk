@@ -28,23 +28,42 @@ function cleanEnv(): Record<string, string> {
 const SCROLLBACK_CHARS = 512 * 1024
 // The footer is looked for in this much of the latest output.
 const MODE_TAIL_CHARS = 3000
+// …at most this often per session while output streams (the first chunk is read at once).
+const MODE_CHECK_MS = 100
+
+// Private modes (DECSET/DECRST) a program turns on once and relies on:
+// bracketed paste, cursor keys, mouse and focus reporting, the alternate
+// screen, cursor visibility.
+const DECSET_RE = /\x1b\[\?([\d;]+)([hl])/g
 
 /**
- * The last SCROLLBACK_CHARS of output, kept as the chunks that arrived and
- * joined only when a replay asks for it. Appending to one 512 KB string copied
- * it whole on every chunk, which was most of the main process's time while
- * sessions streamed.
+ * The last SCROLLBACK_CHARS of output (whole chunks), kept as the chunks that
+ * arrived and joined only when a replay asks for it. Appending to one 512 KB
+ * string copied it whole on every chunk, which was most of the main process's
+ * time while sessions streamed.
+ *
+ * A replay starts with the private modes in force where the kept output
+ * begins, so a terminal redrawn from it (a reload, or one unloaded while
+ * hidden) pastes and reads keys the way the program set it up long ago.
  */
 export class Replay {
   private chunks: string[] = []
   private head = 0
   private length = 0
+  /** Mode -> 'h' | 'l', as of the oldest kept chunk. */
+  private modes = new Map<string, string>()
 
   push(data: string): void {
     this.chunks.push(data)
     this.length += data.length
-    // Drop whole chunks that are entirely older than the limit.
-    while (this.length - this.chunks[this.head].length >= SCROLLBACK_CHARS) this.length -= this.chunks[this.head++].length
+    // Drop whole chunks that are entirely older than the limit, keeping the modes they set.
+    while (this.length - this.chunks[this.head].length >= SCROLLBACK_CHARS) {
+      const old = this.chunks[this.head++]
+      this.length -= old.length
+      if (old.includes('\x1b[?')) {
+        for (const m of old.matchAll(DECSET_RE)) for (const mode of m[1].split(';')) if (mode) this.modes.set(mode, m[2])
+      }
+    }
     if (this.head > 1024 && this.head * 2 > this.chunks.length) {
       this.chunks = this.chunks.slice(this.head)
       this.head = 0
@@ -52,16 +71,23 @@ export class Replay {
   }
 
   text(): string {
-    const all = (this.head ? this.chunks.slice(this.head) : this.chunks).join('')
-    return all.length > SCROLLBACK_CHARS ? all.slice(-SCROLLBACK_CHARS) : all
+    let prefix = ''
+    for (const [mode, v] of this.modes) prefix += `\x1b[?${mode}${v}`
+    return prefix + (this.head ? this.chunks.slice(this.head) : this.chunks).join('')
   }
 }
+
+/** What a session that exited showed last, for redrawing its terminal; the most recent ones only. */
+const ENDED_KEPT = 32
 
 interface Term {
   proc: pty.IPty
   buffer: Replay
   /** The latest MODE_TAIL_CHARS of output. */
   tail: string
+  /** Mode detection is throttled: a check is pending, and output arrived since the last one. */
+  modeTimer?: NodeJS.Timeout
+  modeDirty?: boolean
   /** The permission mode its footer shows last. */
   mode: PermissionMode | null
 }
@@ -122,6 +148,7 @@ function spawnClaude(args: string[], cwd: string, cols: number, rows: number): p
 
 export class PtyManager {
   private terms = new Map<string, Term>()
+  private ended = new Map<string, string>()
   private headless = new Set<pty.IPty>()
 
   constructor(
@@ -162,6 +189,11 @@ export class PtyManager {
     return this.terms.has(sessionId)
   }
 
+  /** What the session's terminal shows (running, or recently exited), to redraw it; '' if unknown. Starts nothing. */
+  replay(sessionId: string): string {
+    return this.terms.get(sessionId)?.buffer.text() ?? this.ended.get(sessionId) ?? ''
+  }
+
   /**
    * `brief` is appended to Claude's system prompt: on new sessions, and on a
    * resume that kicks off ticket work. `prompt` is sent as the opening turn.
@@ -170,6 +202,7 @@ export class PtyManager {
     if (!UUID_RE.test(req.sessionId)) throw new Error(`not a session id: ${req.sessionId}`)
     const existing = this.terms.get(req.sessionId)
     if (existing) return existing.buffer.text()
+    this.ended.delete(req.sessionId)
 
     const args = req.resume ? ['--resume', req.sessionId] : ['--session-id', req.sessionId]
     if (brief && (!req.resume || req.kickoff)) args.push('--append-system-prompt', brief)
@@ -191,16 +224,31 @@ export class PtyManager {
       term.buffer.push(data)
       this.onData(req.sessionId, data)
       term.tail = data.length >= MODE_TAIL_CHARS ? data.slice(-MODE_TAIL_CHARS) : (term.tail + data).slice(-MODE_TAIL_CHARS)
-      // Every chunk: the footer's words arrive split by cursor moves, so a
-      // cheap pre-check would miss them; a few thousand characters is cheap.
+      // The footer's words arrive split by cursor moves, so a cheap pre-check
+      // would miss them. Read the tail now, then at most every MODE_CHECK_MS
+      // while output keeps coming (with dozens of sessions streaming, reading
+      // it on every chunk was the main process's biggest cost).
+      if (term.modeTimer) term.modeDirty = true
+      else checkMode()
+    })
+    const checkMode = () => {
+      term.modeDirty = false
       const mode = detectMode(term.tail)
       if (mode && mode !== term.mode) {
         term.mode = mode
         this.onMode(req.sessionId, mode)
       }
-    })
+      term.modeTimer = setTimeout(() => {
+        term.modeTimer = undefined
+        if (term.modeDirty) checkMode()
+      }, MODE_CHECK_MS)
+    }
     proc.onExit(({ exitCode }) => {
+      clearTimeout(term.modeTimer)
       this.terms.delete(req.sessionId)
+      this.ended.delete(req.sessionId)
+      this.ended.set(req.sessionId, term.buffer.text())
+      if (this.ended.size > ENDED_KEPT) this.ended.delete(this.ended.keys().next().value!)
       const declinedBypass = args.includes('bypassPermissions') && term.mode !== 'bypassPermissions'
       this.onExit(req.sessionId, exitCode, declinedBypass)
     })

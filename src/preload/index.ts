@@ -16,6 +16,7 @@ const api: DeskApi = {
   ptyWrite: (id, data) => ipcRenderer.send('pty:write', id, data),
   ptyResize: (id, cols, rows) => ipcRenderer.send('pty:resize', id, cols, rows),
   ptyKill: (id) => ipcRenderer.invoke('pty:kill', id),
+  ptyReplay: (id) => ipcRenderer.invoke('pty:replay', id),
   ptyStop: (id) => ipcRenderer.invoke('pty:stop', id),
   setSessionLaunch: (id, choice) => ipcRenderer.invoke('session:setLaunch', id, choice),
   openFolder: (id, how) => ipcRenderer.invoke('folder:open', id, how),

@@ -288,6 +288,11 @@ export async function parseSession(path: string): Promise<CacheEntry['summary']>
   return summarize(s, path)
 }
 
+// Read and parsed this much at a time, yielding in between: one long session
+// (64 MB) read in one piece blocked the main process for ~90 ms, holding up
+// terminal output and IPC, and held the whole file in memory.
+const READ_CHUNK = 4 * 1024 * 1024
+
 /**
  * Reads what was appended since `s.offset`, up to the last whole line (a line
  * still being written is read next time). Resolves false when the file is
@@ -298,13 +303,24 @@ async function readOn(path: string, s: ParseState, size: number): Promise<boolea
   if (size === s.offset) return true
   const handle = await fs.open(path, 'r')
   try {
-    const buf = Buffer.alloc(size - s.offset)
-    const { bytesRead } = await handle.read(buf, 0, buf.length, s.offset)
-    // A line break byte never falls inside a UTF-8 character, so cutting there is safe.
-    const end = buf.subarray(0, bytesRead).lastIndexOf(0x0a)
-    if (end < 0) return true
-    feed(s, buf.toString('utf8', 0, end))
-    s.offset += end + 1
+    // Bytes after the last line break read so far: the start of a line that continues in the next piece.
+    let carry: Buffer = Buffer.alloc(0)
+    for (let pos = s.offset; pos < size; ) {
+      const buf = Buffer.alloc(Math.min(READ_CHUNK, size - pos))
+      const { bytesRead } = await handle.read(buf, 0, buf.length, pos)
+      if (!bytesRead) break
+      pos += bytesRead
+      const data = carry.length ? Buffer.concat([carry, buf.subarray(0, bytesRead)]) : buf.subarray(0, bytesRead)
+      // A line break byte never falls inside a UTF-8 character, so cutting there is safe.
+      const end = data.lastIndexOf(0x0a)
+      if (end < 0) {
+        carry = data
+        continue
+      }
+      feed(s, data.toString('utf8', 0, end))
+      s.offset += end + 1
+      carry = data.subarray(end + 1)
+    }
     return true
   } finally {
     await handle.close()

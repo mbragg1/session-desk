@@ -1,0 +1,224 @@
+{
+  "label": "MB1",
+  "at": "2026-10-29T20:16:59.602Z",
+  "machine": {
+    "cpu": "Apple M4",
+    "cores": 10,
+    "memGB": 16,
+    "os": "26.4.1",
+    "electron": "v24.21.0"
+  },
+  "config": {
+    "indexed": [
+      100
+    ],
+    "open": [
+      1,
+      10,
+      25,
+      50
+    ],
+    "ratePerSession": 50,
+    "windowS": 12,
+    "idleS": 20
+  },
+  "startup": [
+    {
+      "indexed": 100,
+      "cold": true,
+      "run": 0,
+      "toNavigationMs": 182.1,
+      "toDomContentLoadedMs": 272.7,
+      "toFirstSidebarRowMs": 1013,
+      "toFirstTerminalFrameMs": 326.7,
+      "sidebarRows": 100
+    },
+    {
+      "indexed": 100,
+      "cold": false,
+      "run": 1,
+      "toNavigationMs": 232,
+      "toDomContentLoadedMs": 332.9,
+      "toFirstSidebarRowMs": 387,
+      "toFirstTerminalFrameMs": 385.9,
+      "sidebarRows": 100
+    },
+    {
+      "indexed": 100,
+      "cold": false,
+      "run": 2,
+      "toNavigationMs": 223.5,
+      "toDomContentLoadedMs": 304.5,
+      "toFirstSidebarRowMs": 360,
+      "toFirstTerminalFrameMs": 357.9,
+      "sidebarRows": 100
+    }
+  ],
+  "idle": {
+    "100": {
+      "cpuPercent": {
+        "main": 0.3,
+        "renderer": 0.4,
+        "gpu": 0.55,
+        "utility": 0,
+        "total": 1.25
+      },
+      "rssMB": {
+        "main": 147.64,
+        "renderer": 123.88,
+        "gpu": 67.89,
+        "utility": 40.09,
+        "total": 379.5
+      },
+      "longAnimationFrames": 0,
+      "terminalRenders": 0,
+      "rendererHeapMB": 9.54
+    }
+  },
+  "streaming": {
+    "100x1": {
+      "indexed": 100,
+      "openStreaming": 1,
+      "cpuPercent": {
+        "main": 4,
+        "renderer": 26.67,
+        "gpu": 7.33,
+        "utility": 0,
+        "total": 38
+      },
+      "rssMB": {
+        "main": 146.91,
+        "renderer": 176.95,
+        "gpu": 69.81,
+        "utility": 37.75,
+        "total": 431.42
+      },
+      "rssPerOpenTerminalMB": 51.92,
+      "frames": 1447,
+      "fps": 119.91,
+      "frameP50Ms": 8.3,
+      "frameP95Ms": 9.1,
+      "frameP99Ms": 9.3,
+      "framesOver20Ms": 0,
+      "longAnimationFrames": 0,
+      "blockingMs": 0,
+      "latencyParseP50Ms": 0.07,
+      "latencyParseP95Ms": 0.63,
+      "latencyDisplayP50Ms": 7.16,
+      "latencyDisplayP95Ms": 11.67,
+      "latencyDisplayP99Ms": 12.31,
+      "terminalRenders": 605,
+      "rendererHeapMB": 9.54
+    },
+    "100x10": {
+      "indexed": 100,
+      "openStreaming": 10,
+      "cpuPercent": {
+        "main": 6.25,
+        "renderer": 32.25,
+        "gpu": 6.08,
+        "utility": 0,
+        "total": 44.58
+      },
+      "rssMB": {
+        "main": 157.98,
+        "renderer": 237.81,
+        "gpu": 70.84,
+        "utility": 39.16,
+        "total": 505.8
+      },
+      "rssPerOpenTerminalMB": 12.63,
+      "frames": 1445,
+      "fps": 119.92,
+      "frameP50Ms": 8.3,
+      "frameP95Ms": 9.1,
+      "frameP99Ms": 9.3,
+      "framesOver20Ms": 0,
+      "longAnimationFrames": 0,
+      "blockingMs": 0,
+      "latencyParseP50Ms": 8.39,
+      "latencyParseP95Ms": 18.8,
+      "latencyDisplayP50Ms": 9.3,
+      "latencyDisplayP95Ms": 11.88,
+      "latencyDisplayP99Ms": 14.11,
+      "terminalRenders": 604,
+      "rendererHeapMB": 9.54
+    },
+    "100x25": {
+      "indexed": 100,
+      "openStreaming": 25,
+      "cpuPercent": {
+        "main": 8.08,
+        "renderer": 38.75,
+        "gpu": 5.58,
+        "utility": 0,
+        "total": 52.41
+      },
+      "rssMB": {
+        "main": 186.03,
+        "renderer": 322.19,
+        "gpu": 70.16,
+        "utility": 39.16,
+        "total": 617.53
+      },
+      "rssPerOpenTerminalMB": 9.52,
+      "frames": 1447,
+      "fps": 120.04,
+      "frameP50Ms": 8.3,
+      "frameP95Ms": 9.2,
+      "frameP99Ms": 9.3,
+      "framesOver20Ms": 0,
+      "longAnimationFrames": 0,
+      "blockingMs": 0,
+      "latencyParseP50Ms": 8.57,
+      "latencyParseP95Ms": 19.2,
+      "latencyDisplayP50Ms": 8.32,
+      "latencyDisplayP95Ms": 14.12,
+      "latencyDisplayP99Ms": 15.15,
+      "terminalRenders": 604,
+      "rendererHeapMB": 9.54
+    },
+    "100x50": {
+      "indexed": 100,
+      "openStreaming": 50,
+      "cpuPercent": {
+        "main": 12.42,
+        "renderer": 44.42,
+        "gpu": 5,
+        "utility": 0,
+        "total": 61.84
+      },
+      "rssMB": {
+        "main": 208.31,
+        "renderer": 370.58,
+        "gpu": 72.14,
+        "utility": 37.47,
+        "total": 688.5
+      },
+      "rssPerOpenTerminalMB": 6.18,
+      "frames": 1321,
+      "fps": 109.62,
+      "frameP50Ms": 8.3,
+      "frameP95Ms": 9.2,
+      "frameP99Ms": 9.3,
+      "framesOver20Ms": 2,
+      "longAnimationFrames": 0,
+      "blockingMs": 0,
+      "latencyParseP50Ms": 10.06,
+      "latencyParseP95Ms": 19.35,
+      "latencyDisplayP50Ms": 12.6,
+      "latencyDisplayP95Ms": 421.9,
+      "latencyDisplayP99Ms": 822.75,
+      "terminalRenders": 552,
+      "rendererHeapMB": 9.54
+    }
+  },
+  "switching": {
+    "100": {
+      "opened": 50,
+      "toLongUnviewedMs": 25.9,
+      "toRecentMs": 5.2,
+      "loadedTerminals": 28
+    }
+  }
+}

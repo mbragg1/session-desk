@@ -4,9 +4,10 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { cpus, totalmem, tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { monitorEventLoopDelay } from 'node:perf_hooks'
 import { afterAll, describe, it, vi } from 'vitest'
 // @ts-expect-error plain JS helper
-import { appendTurn, buildClaudeDir } from './fixtures.mjs'
+import { appendTurn, buildClaudeDir, rng, transcript, uuid } from './fixtures.mjs'
 
 const fakePty = vi.hoisted(() => ({ last: null as null | { emit: (d: string) => void } }))
 vi.mock('node-pty', () => ({
@@ -31,6 +32,15 @@ const results: Record<string, unknown> = {
   label: process.env.BENCH_LABEL ?? 'run',
   at: new Date().toISOString(),
   machine: { cpu: cpus()[0]?.model, cores: cpus().length, memGB: Math.round(totalmem() / 2 ** 30), node: process.version }
+}
+
+/** The longest the event loop was blocked while `fn` ran: what IPC and terminal output would wait behind. */
+async function blocking(fn: () => Promise<unknown>): Promise<{ maxMs: number; p99Ms: number }> {
+  const h = monitorEventLoopDelay({ resolution: 1 })
+  h.enable()
+  await fn()
+  h.disable()
+  return { maxMs: Math.round(h.max / 1e4) / 100, p99Ms: Math.round(h.percentile(99) / 1e4) / 100 }
 }
 
 const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]
@@ -70,7 +80,8 @@ describe('session scan', () => {
         heapCold = Math.max(heapCold, process.memoryUsage().heapUsed - h0)
       }
       const { listSessions } = await freshSessions()
-      const list = await listSessions({ ownPids: new Set(), includeSdk: false, claudeDir: dir })
+      let list: Awaited<ReturnType<typeof listSessions>> = []
+      const coldBlocking = await blocking(async () => (list = await listSessions({ ownPids: new Set(), includeSdk: false, claudeDir: dir })))
       const warm: number[] = []
       for (let i = 0; i < 9; i++) {
         const t = performance.now()
@@ -103,6 +114,7 @@ describe('session scan', () => {
       }
       results[`scan.${count}`] = {
         relaunchWithSavedCacheMs: relaunchMs,
+        coldEventLoopBlockMaxMs: coldBlocking.maxMs,
         sessions: list.length,
         coldMs: ms(median(cold)),
         warmNoChangeMs: ms(median(warm)),
@@ -114,7 +126,35 @@ describe('session scan', () => {
   }
 })
 
-describe('search', () => {
+// One very long session (real ones reach tens of MB): how long a single file blocks the event loop.
+describe('one huge transcript', () => {
+  it('64 MB', async () => {
+    const dir = join(ROOT, 'claude-huge')
+    if (!existsSync(join(dir, '.ready'))) {
+      const r = rng(9)
+      const id = uuid(r)
+      mkdirSync(join(dir, 'projects', '-huge'), { recursive: true })
+      writeFileSync(join(dir, 'projects', '-huge', `${id}.jsonl`), transcript(r, id, join(ROOT, 'workspace'), 64 * 2 ** 20, Date.now()))
+      writeFileSync(join(dir, '.ready'), '')
+    }
+    const { listSessions } = await freshSessions()
+    global.gc?.()
+    const h0 = process.memoryUsage().heapUsed
+    let peak = 0
+    const sample = setInterval(() => (peak = Math.max(peak, process.memoryUsage().heapUsed - h0)), 5)
+    let t = performance.now()
+    const scan = await blocking(() => listSessions({ ownPids: new Set(), includeSdk: false, claudeDir: dir }))
+    const scanMs = performance.now() - t
+    clearInterval(sample)
+    vi.resetModules()
+    const { searchTranscripts } = await import('../src/main/search')
+    t = performance.now()
+    const search = await blocking(() => searchTranscripts('state world', join(dir, 'projects')))
+    results.huge = { scanMs: ms(scanMs), scanBlockMaxMs: scan.maxMs, scanPeakHeapMB: ms(peak / 2 ** 20), searchMs: ms(performance.now() - t), searchBlockMaxMs: search.maxMs }
+  }, 600_000)
+})
+
+describe.skipIf(!COUNTS.some((c) => c >= 25))('search', () => {
   for (const count of COUNTS.filter((c) => c >= 25)) {
     it(`${count} sessions`, async () => {
       const dir = fixture(count)
@@ -122,7 +162,7 @@ describe('search', () => {
       const { searchTranscripts } = await import('../src/main/search')
       const projects = join(dir, 'projects')
       let t = performance.now()
-      await searchTranscripts('state world', projects)
+      const coldBlocking = await blocking(() => searchTranscripts('state world', projects))
       const cold = performance.now() - t
       const warm: number[] = []
       for (const q of ['good people', 'little state work', 'never day', 'zzzz', 'the']) {
@@ -130,7 +170,7 @@ describe('search', () => {
         await searchTranscripts(q, projects)
         warm.push(performance.now() - t)
       }
-      results[`search.${count}`] = { coldMs: ms(cold), warmMedianMs: ms(median(warm)), heapMB: ms(process.memoryUsage().heapUsed / 2 ** 20) }
+      results[`search.${count}`] = { coldEventLoopBlockMaxMs: coldBlocking.maxMs, coldMs: ms(cold), warmMedianMs: ms(median(warm)), heapMB: ms(process.memoryUsage().heapUsed / 2 ** 20) }
     }, 600_000)
   }
 })

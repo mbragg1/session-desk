@@ -1,0 +1,17 @@
+{
+  "label": "hugeB",
+  "at": "2026-10-29T20:54:28.096Z",
+  "machine": {
+    "cpu": "Apple M4",
+    "cores": 10,
+    "memGB": 16,
+    "node": "v22.22.3"
+  },
+  "huge": {
+    "scanMs": 102.14,
+    "scanBlockMaxMs": 7.41,
+    "scanPeakHeapMB": 38.01,
+    "searchMs": 77.52,
+    "searchBlockMaxMs": 2.92
+  }
+}

@@ -584,6 +584,8 @@ export interface DeskApi {
   ptyWrite(sessionId: string, data: string): void
   ptyResize(sessionId: string, cols: number, rows: number): void
   ptyKill(sessionId: string): Promise<void>
+  /** What a running or recently exited session's terminal shows, to redraw it; starts nothing. */
+  ptyReplay(sessionId: string): Promise<string>
   /**
    * Checkouts working on a ticket (local git only): a branch or folder naming
    * it, or a checkout of one of its PRs (`prHeads`: their repo and branch).
