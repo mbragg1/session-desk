@@ -577,6 +577,8 @@ export interface DeskApi {
   defaultCwd(): Promise<string>
   /** The file's path on disk, for a file dropped from Finder; '' when it has none (e.g. dragged from a web page). */
   pathForFile(file: File): string
+  /** Benchmark instrumentation is on (SESSION_DESK_BENCH=1); see bench/. */
+  bench: boolean
   /** Starts (or re-attaches to) a terminal; resolves with output to replay when re-attaching. */
   ptyStart(req: PtyStartRequest): Promise<string>
   ptyWrite(sessionId: string, data: string): void
@@ -670,6 +672,8 @@ export interface DeskApi {
   pruneWorktrees(repoPath: string): Promise<void>
   /** Tells the main process which session is on screen, so it isn't notified about it. */
   setActiveSession(sessionId: string | null): void
+  /** The terminal on screen, if any: its output is delivered without batching. */
+  setVisibleTerminal(sessionId: string | null): void
   getSettings(): Promise<Settings>
   hookStatus(): Promise<HookStatus>
   /** The exact settings.json change (unified diff); empty when nothing would change. */

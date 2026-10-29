@@ -336,6 +336,7 @@ export function App() {
 
   const activeTermId = nav.kind === 'session' ? nav.id : nav.kind === 'new' ? (draft?.id ?? null) : null
   const activeTerm = terms.find((t) => t.id === activeTermId)
+  useEffect(() => window.desk.setVisibleTerminal(activeTermId), [activeTermId])
 
   // Model/effort chosen here. The scan reports it for sessions; a new chat has
   // no summary yet, so its choice is kept here (it also shows before the scan catches up).

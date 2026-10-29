@@ -4,6 +4,8 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import type { Kickoff, PrBranch } from '../../../shared/types'
 import { dropText, hasFiles } from '../dropPaths'
+import { benchTerminal } from '../bench'
+import { onSessionOutput } from '../ptyBus'
 
 interface Props {
   sessionId: string
@@ -18,6 +20,9 @@ interface Props {
   fontSize: number
   onExit: (code: number) => void
 }
+
+/** How long the cursor blinks after the last keystroke before it holds steady. */
+const CURSOR_BLINK_MS = 10_000
 
 export function themeFromCss(): Record<string, string> {
   const css = getComputedStyle(document.documentElement)
@@ -58,21 +63,33 @@ export function Terminal({ sessionId, resume, cwd, ticket, kickoff, prBranch, vi
     xterm.open(host.current!)
     term.current = xterm
     fit.current = fitAddon
+    const offBench = window.desk.bench ? benchTerminal(xterm, host.current!) : () => {}
     try {
       fitAddon.fit()
     } catch {
       // Hidden on mount; fitted when shown.
     }
 
-    const offData = window.desk.onPtyData((id, data) => {
-      if (id === sessionId) xterm.write(data)
-    })
+    const offData = onSessionOutput(sessionId, (data) => xterm.write(data))
     const offExit = window.desk.onPtyExit((id, code) => {
       if (id !== sessionId) return
       xterm.write(`\r\n\x1b[2m[claude exited with code ${code}]\x1b[0m\r\n`)
       exitRef.current(code)
     })
-    const input = xterm.onData((d) => window.desk.ptyWrite(sessionId, d))
+    const input = xterm.onData((d) => {
+      window.desk.ptyWrite(sessionId, d)
+      blinkAwhile()
+    })
+    // The cursor blinks by an endless CSS animation, which has Chromium paint
+    // the window at the display's full rate (about 10% CPU at 120 Hz) for as
+    // long as the terminal has focus. Blink after typing, then hold it steady.
+    let blinkTimer: ReturnType<typeof setTimeout> | undefined
+    const blinkAwhile = () => {
+      if (!xterm.options.cursorBlink) xterm.options.cursorBlink = true
+      clearTimeout(blinkTimer)
+      blinkTimer = setTimeout(() => (xterm.options.cursorBlink = false), CURSOR_BLINK_MS)
+    }
+    blinkAwhile()
     const resize = xterm.onResize(({ cols, rows }) => window.desk.ptyResize(sessionId, cols, rows))
 
     window.desk
@@ -96,6 +113,8 @@ export function Terminal({ sessionId, resume, cwd, ticket, kickoff, prBranch, vi
     ro.observe(host.current!)
 
     return () => {
+      clearTimeout(blinkTimer)
+      offBench()
       ro.disconnect()
       scheme.removeEventListener('change', retheme)
       offData()

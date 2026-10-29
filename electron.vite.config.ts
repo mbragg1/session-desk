@@ -8,7 +8,8 @@ export default defineConfig({
   preload: { plugins: [externalizeDepsPlugin()] },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
-    build: { rollupOptions: { input: resolve(__dirname, 'src/renderer/index.html') } },
+    // Minified: about half the bytes for V8 to parse and compile at every launch.
+    build: { minify: true, rollupOptions: { input: resolve(__dirname, 'src/renderer/index.html') } },
     plugins: [react()],
     // The app's version (package.json), shown in Settings.
     define: { __APP_VERSION__: JSON.stringify(version) }

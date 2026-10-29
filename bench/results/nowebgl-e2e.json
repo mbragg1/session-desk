@@ -1,0 +1,181 @@
+{
+  "label": "nowebgl",
+  "at": "2026-10-29T19:25:45.507Z",
+  "machine": {
+    "cpu": "Apple M4",
+    "cores": 10,
+    "memGB": 16,
+    "os": "26.4.1",
+    "electron": "v24.21.0"
+  },
+  "config": {
+    "indexed": [
+      100
+    ],
+    "open": [
+      1,
+      10,
+      25
+    ],
+    "ratePerSession": 50,
+    "windowS": 15,
+    "idleS": 5
+  },
+  "startup": [
+    {
+      "indexed": 100,
+      "cold": true,
+      "run": 0,
+      "toNavigationMs": 426.7,
+      "toDomContentLoadedMs": 925.2,
+      "toFirstSidebarRowMs": 1275,
+      "toFirstTerminalFrameMs": 1407.3,
+      "sidebarRows": 100
+    },
+    {
+      "indexed": 100,
+      "cold": false,
+      "run": 1,
+      "toNavigationMs": 224,
+      "toDomContentLoadedMs": 330.2,
+      "toFirstSidebarRowMs": 538,
+      "toFirstTerminalFrameMs": 416,
+      "sidebarRows": 100
+    },
+    {
+      "indexed": 100,
+      "cold": false,
+      "run": 2,
+      "toNavigationMs": 214.4,
+      "toDomContentLoadedMs": 301.4,
+      "toFirstSidebarRowMs": 471,
+      "toFirstTerminalFrameMs": 339.7,
+      "sidebarRows": 100
+    }
+  ],
+  "idle": {
+    "100": {
+      "cpuPercent": {
+        "main": 1.8,
+        "renderer": 6.2,
+        "gpu": 2.6,
+        "utility": 0,
+        "total": 10.6
+      },
+      "rssMB": {
+        "main": 213.72,
+        "renderer": 148.45,
+        "gpu": 91.81,
+        "utility": 45.44,
+        "total": 499.42
+      },
+      "longAnimationFrames": 0,
+      "terminalRenders": 1,
+      "rendererHeapMB": 11.35
+    }
+  },
+  "streaming": {
+    "100x1": {
+      "indexed": 100,
+      "openStreaming": 1,
+      "cpuPercent": {
+        "main": 3.2,
+        "renderer": 25.47,
+        "gpu": 7.13,
+        "utility": 0,
+        "total": 35.8
+      },
+      "rssMB": {
+        "main": 197.63,
+        "renderer": 216.17,
+        "gpu": 96.47,
+        "utility": 45.44,
+        "total": 555.7
+      },
+      "rssPerOpenTerminalMB": 56.28,
+      "frames": 1808,
+      "fps": 119.93,
+      "frameP50Ms": 8.3,
+      "frameP95Ms": 9.2,
+      "frameP99Ms": 9.3,
+      "framesOver20Ms": 0,
+      "longAnimationFrames": 0,
+      "blockingMs": 0,
+      "latencyParseP50Ms": 0.61,
+      "latencyParseP95Ms": 1,
+      "latencyDisplayP50Ms": 9,
+      "latencyDisplayP95Ms": 11.65,
+      "latencyDisplayP99Ms": 12.14,
+      "terminalRenders": 754,
+      "rendererHeapMB": 11.35
+    },
+    "100x10": {
+      "indexed": 100,
+      "openStreaming": 10,
+      "cpuPercent": {
+        "main": 6.13,
+        "renderer": 30.47,
+        "gpu": 6.2,
+        "utility": 0,
+        "total": 42.8
+      },
+      "rssMB": {
+        "main": 180.73,
+        "renderer": 237.25,
+        "gpu": 76.2,
+        "utility": 39.91,
+        "total": 534.09
+      },
+      "rssPerOpenTerminalMB": 3.47,
+      "frames": 1809,
+      "fps": 120.1,
+      "frameP50Ms": 8.3,
+      "frameP95Ms": 9.1,
+      "frameP99Ms": 9.3,
+      "framesOver20Ms": 0,
+      "longAnimationFrames": 0,
+      "blockingMs": 0,
+      "latencyParseP50Ms": 8.44,
+      "latencyParseP95Ms": 16.91,
+      "latencyDisplayP50Ms": 7.63,
+      "latencyDisplayP95Ms": 11.24,
+      "latencyDisplayP99Ms": 12.16,
+      "terminalRenders": 754,
+      "rendererHeapMB": 11.35
+    },
+    "100x25": {
+      "indexed": 100,
+      "openStreaming": 25,
+      "cpuPercent": {
+        "main": 7.87,
+        "renderer": 35.53,
+        "gpu": 5.87,
+        "utility": 0,
+        "total": 49.27
+      },
+      "rssMB": {
+        "main": 204.11,
+        "renderer": 295.61,
+        "gpu": 72.73,
+        "utility": 39.19,
+        "total": 611.64
+      },
+      "rssPerOpenTerminalMB": 4.49,
+      "frames": 1808,
+      "fps": 120,
+      "frameP50Ms": 8.3,
+      "frameP95Ms": 9.1,
+      "frameP99Ms": 9.3,
+      "framesOver20Ms": 0,
+      "longAnimationFrames": 0,
+      "blockingMs": 0,
+      "latencyParseP50Ms": 8.49,
+      "latencyParseP95Ms": 16.84,
+      "latencyDisplayP50Ms": 8.93,
+      "latencyDisplayP95Ms": 11.28,
+      "latencyDisplayP99Ms": 13.32,
+      "terminalRenders": 754,
+      "rendererHeapMB": 11.35
+    }
+  }
+}

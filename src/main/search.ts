@@ -45,6 +45,10 @@ async function indexFile(path: string): Promise<IndexedFile | null> {
   for (const line of raw.split('\n')) {
     const user = line.includes('"type":"user"')
     if (!user && !line.includes('"type":"assistant"')) continue
+    // Tool results (skipped below) are most of a transcript's bytes: don't
+    // parse them to find that out. Quotes inside JSON strings are escaped, so
+    // this only matches the key itself.
+    if (user && line.includes('"toolUseResult":')) continue
     let d: any
     try {
       d = JSON.parse(line)

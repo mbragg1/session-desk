@@ -13,6 +13,8 @@
     "dist": "electron-vite build && electron-builder --mac --dir",
     "install-app": "npm run dist && node scripts/install-app.mjs",
     "test": "vitest run",
+    "bench:main": "vitest run -c vitest.bench.config.ts",
+    "bench:e2e": "electron-vite build && node bench/e2e/run.mjs",
     "hooks": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/install-hooks.mjs"
   },
   "dependencies": {

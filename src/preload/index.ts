@@ -11,6 +11,7 @@ const api: DeskApi = {
   listSessions: () => ipcRenderer.invoke('sessions:list'),
   defaultCwd: () => ipcRenderer.invoke('sessions:defaultCwd'),
   pathForFile: (file) => webUtils.getPathForFile(file),
+  bench: process.env.SESSION_DESK_BENCH === '1',
   ptyStart: (req) => ipcRenderer.invoke('pty:start', req),
   ptyWrite: (id, data) => ipcRenderer.send('pty:write', id, data),
   ptyResize: (id, cols, rows) => ipcRenderer.send('pty:resize', id, cols, rows),
@@ -31,7 +32,11 @@ const api: DeskApi = {
   deleteRemoteBranch: (slug, branch) => ipcRenderer.invoke('branches:deleteRemote', slug, branch),
   ticketBranches: (ticket, prHeads) => ipcRenderer.invoke('worktrees:forTicket', ticket, prHeads),
   ptyKickoff: (id, ticket, kind, prBranch) => ipcRenderer.invoke('pty:kickoff', id, ticket, kind, prBranch),
-  onPtyData: (cb) => subscribe('pty:data', cb),
+  // Output arrives batched (see main/ptyBatch.ts): one call per session in it, in order.
+  onPtyData: (cb) =>
+    subscribe('pty:data', (batch: [string, string][]) => {
+      for (const [id, data] of batch) cb(id, data)
+    }),
   onPtyExit: (cb) => subscribe('pty:exit', cb),
   onSessionsChanged: (cb) => subscribe('sessions:changed', cb),
   linkSession: (id, ticket) => ipcRenderer.invoke('sessions:link', id, ticket),
@@ -65,6 +70,7 @@ const api: DeskApi = {
   removeWorktree: (path, deleteBranch) => ipcRenderer.invoke('worktrees:remove', path, deleteBranch),
   pruneWorktrees: (repoPath) => ipcRenderer.invoke('worktrees:prune', repoPath),
   setActiveSession: (id) => ipcRenderer.send('ui:active', id),
+  setVisibleTerminal: (id) => ipcRenderer.send('ui:visibleTerminal', id),
   onNavigateToSession: (cb) => subscribe('nav:session', cb),
   onNotice: (cb) => subscribe('notice', cb),
   getSettings: () => ipcRenderer.invoke('settings:get'),

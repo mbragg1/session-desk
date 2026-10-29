@@ -393,6 +393,7 @@ export async function listSessions(opts: {
     }
   })
 
+  if (!opts.claudeDir) pruneScanCache(new Set(files))
   const live = await liveSessions(opts.ownPids, join(base, 'sessions'))
   return summaries
     .filter((s): s is NonNullable<typeof s> => s !== null)
@@ -407,6 +408,60 @@ export async function listSessions(opts: {
       launch: null
     }))
     .sort((a, b) => b.lastActivity - a.lastActivity)
+}
+
+// The scan cache on disk, so a launch reads only what was appended since the
+// last run instead of every transcript in full (hundreds of MB for a long
+// history). Bump the version whenever ParseState or what feed() reads changes.
+const SCAN_CACHE_VERSION = 1
+
+type SavedState = Omit<ParseState, 'prs' | 'tickets' | 'scored' | 'planCalls'> & {
+  prs: [string, PrLink][]
+  tickets: [string, [number, number]][]
+  scored: string[]
+  planCalls: string[]
+}
+
+/** The cache as JSON, for the ticket keys it was read with. */
+export function serializeScanCache(): string {
+  const entries: [string, Omit<CacheEntry, 'state'> & { state: SavedState }][] = []
+  for (const [path, e] of cache) {
+    const s = e.state
+    entries.push([
+      path,
+      { ...e, state: { ...s, prs: [...s.prs], tickets: [...s.tickets], scored: [...s.scored], planCalls: [...s.planCalls] } }
+    ])
+  }
+  return JSON.stringify({ version: SCAN_CACHE_VERSION, ticketKeys, entries })
+}
+
+/**
+ * Seeds the cache from serializeScanCache() output. Ignored when it was made
+ * by another version or for other ticket keys; entries are still checked
+ * against each file's size, mtime and inode before use.
+ */
+export function restoreScanCache(json: string): boolean {
+  let d: { version?: number; ticketKeys?: string[]; entries?: [string, CacheEntry & { state: SavedState }][] }
+  try {
+    d = JSON.parse(json)
+  } catch {
+    return false
+  }
+  if (d.version !== SCAN_CACHE_VERSION || d.ticketKeys?.join() !== ticketKeys.join() || !Array.isArray(d.entries)) return false
+  for (const [path, e] of d.entries) {
+    if (cache.has(path)) continue
+    const s = e.state
+    cache.set(path, {
+      ...e,
+      state: { ...s, prs: new Map(s.prs), tickets: new Map(s.tickets), scored: new Set(s.scored), planCalls: new Set(s.planCalls) }
+    })
+  }
+  return true
+}
+
+/** Forgets files that no longer exist, so the saved cache doesn't grow forever. */
+export function pruneScanCache(seen: Set<string>): void {
+  for (const path of cache.keys()) if (!seen.has(path)) cache.delete(path)
 }
 
 /** Calls `onChange` (debounced) whenever any transcript or the live-session registry changes. */

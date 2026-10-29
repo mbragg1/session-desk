@@ -1,0 +1,89 @@
+{
+  "label": "SB2",
+  "at": "2026-10-29T19:44:26.708Z",
+  "machine": {
+    "cpu": "Apple M4",
+    "cores": 10,
+    "memGB": 16,
+    "os": "26.4.1",
+    "electron": "v24.21.0"
+  },
+  "config": {
+    "indexed": [
+      100,
+      250
+    ],
+    "open": [
+      1,
+      10,
+      25
+    ],
+    "ratePerSession": 50,
+    "windowS": 15,
+    "idleS": 20
+  },
+  "startup": [
+    {
+      "indexed": 100,
+      "cold": true,
+      "run": 0,
+      "toNavigationMs": 201.8,
+      "toDomContentLoadedMs": 305.9,
+      "toFirstSidebarRowMs": 475,
+      "toFirstTerminalFrameMs": 367.8,
+      "sidebarRows": 100
+    },
+    {
+      "indexed": 100,
+      "cold": false,
+      "run": 1,
+      "toNavigationMs": 233.6,
+      "toDomContentLoadedMs": 310.6,
+      "toFirstSidebarRowMs": 367,
+      "toFirstTerminalFrameMs": 363.8,
+      "sidebarRows": 100
+    },
+    {
+      "indexed": 100,
+      "cold": false,
+      "run": 2,
+      "toNavigationMs": 246.8,
+      "toDomContentLoadedMs": 339.5,
+      "toFirstSidebarRowMs": 395,
+      "toFirstTerminalFrameMs": 393.1,
+      "sidebarRows": 100
+    },
+    {
+      "indexed": 250,
+      "cold": true,
+      "run": 0,
+      "toNavigationMs": 222.1,
+      "toDomContentLoadedMs": 326,
+      "toFirstSidebarRowMs": 752,
+      "toFirstTerminalFrameMs": 367.9,
+      "sidebarRows": 250
+    },
+    {
+      "indexed": 250,
+      "cold": false,
+      "run": 1,
+      "toNavigationMs": 250.2,
+      "toDomContentLoadedMs": 346,
+      "toFirstSidebarRowMs": 399,
+      "toFirstTerminalFrameMs": 409.4,
+      "sidebarRows": 250
+    },
+    {
+      "indexed": 250,
+      "cold": false,
+      "run": 2,
+      "toNavigationMs": 246.7,
+      "toDomContentLoadedMs": 324.1,
+      "toFirstSidebarRowMs": 361,
+      "toFirstTerminalFrameMs": 397.4,
+      "sidebarRows": 250
+    }
+  ],
+  "idle": {},
+  "streaming": {}
+}

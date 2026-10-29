@@ -1,0 +1,31 @@
+#!/usr/bin/perl
+# Fake Claude Code for benchmarks: draws a TUI-like screen with the mode
+# footer, then (when resumed) streams token-sized chunks at BENCH_RATE per
+# second. Every 10th chunk carries OSC 7777 with the wall-clock ms it was
+# written, which the app's bench hook turns into output-to-display latency.
+use strict;
+use warnings;
+use Time::HiRes qw(time sleep);
+$| = 1;
+my $resumed = grep { $_ eq '--resume' } @ARGV;
+my $rate = $ENV{BENCH_RATE} || 50;
+binmode STDOUT, ':utf8';
+print "\e[2J\e[H\e[1mClaude Code (bench)\e[0m\r\n\r\n> \e[s\e[40;1H\e[38;5;246m\x{23f5}\x{23f5} auto mode on\e[39m\e[u";
+exit 0 if $ENV{BENCH_EXIT};
+sleep 3600 unless $resumed && !$ENV{BENCH_IDLE};
+my $i = 0;
+my @w = qw(the state of work people never little world good day great long make);
+my $next = time;
+while (1) {
+  $i++;
+  my $n = 1 + $i % 7;
+  my $text = join(' ', map { $w[($i * 7 + $_) % @w] } 1 .. $n * 3);
+  my $out = "\e[38;2;200;200;200m$text \e[39m";
+  $out .= "\r\n" if $i % 12 == 0;
+  $out .= "\e[s\e[40;1H\e[38;5;246m\x{23f5}\x{23f5} auto mode on\e[39m\e[u" if $i % 5 == 0;
+  $out .= sprintf("\e]7777;%.3f\a", time * 1000) if $i % 10 == 0;
+  print $out;
+  $next += 1 / $rate;
+  my $d = $next - time;
+  sleep $d if $d > 0;
+}

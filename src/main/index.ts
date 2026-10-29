@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { promises as fs } from 'node:fs'
+import { promises as fs, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { CONFIG_NAME, loadProjectConfig, projectConfig, projectConfigStatus, starterConfig, watchProjectConfig } from './projectConfig'
@@ -18,7 +18,8 @@ import { cleanName, MODE_CYCLE, PtyManager } from './pty'
 import { hookApply, hookPreview, hookStatus } from './hookInstaller'
 import { installMenu, setProjectActions } from './menu'
 import { claudeDir, defaultClaudeDir, describeClaudeDir, loadShellClaudeDir, workspace } from './paths'
-import { listSessions, setTicketKeys, watchSessions } from './sessions'
+import { listSessions, restoreScanCache, serializeScanCache, setTicketKeys, watchSessions } from './sessions'
+import { PtyBatcher } from './ptyBatch'
 import { activityOf, STATUS_DIR, watchActivity, withTurnEnd } from './status'
 import { refreshLocalSync } from './sync'
 import { refreshDeploys, resetDeploys } from './deploys'
@@ -60,10 +61,19 @@ const EXTERNAL_HOSTS = new Set(['github.com', 'linear.app', 'claude.ai', 'nerfgu
 let win: BrowserWindow | null = null
 // The session on screen, as the renderer reports it; null for other views.
 let activeSessionId: string | null = null
+// The terminal on screen (a session's, or the new-session one); its output isn't batched.
+let visibleTerminalId: string | null = null
+
+const ptyOutput = new PtyBatcher(
+  (batch) => win?.webContents.send('pty:data', batch),
+  () => visibleTerminalId
+)
 
 const ptys = new PtyManager(
-  (id, data) => win?.webContents.send('pty:data', id, data),
+  (id, data) => ptyOutput.push(id, data),
   (id, code, declinedBypass) => {
+    // The exit notice follows the session's last output.
+    ptyOutput.flush()
     win?.webContents.send('pty:exit', id, code)
     // "No, exit" on Claude's Bypass warning: forget the choice, or every restart would ask again.
     if (declinedBypass) void store.setSessionLaunch(id, { permissionMode: undefined }).then(notifySessions)
@@ -141,11 +151,37 @@ const TICKET_RE = /^[A-Z][A-Z0-9]*-\d+$/
 // badge and notifications, whether or not the window is open.
 const notifySessions = () => {
   win?.webContents.send('sessions:changed')
+  sessionsChecked()
+}
+
+/** Everything a change notifies except the window: the Dock badge, notifications, Linear rules. */
+const sessionsChecked = () => {
   void indicators.refresh()
   // Automatic Linear moves (only when the user enabled a rule).
   void runAutoMoves(sessions, (text) => win?.webContents.send('notice', text)).then((moved) => moved && notifySessions())
   // Pin the sessions of tickets under way; unpin them at Done.
   void runAutoPins(sessions).then((changed) => changed && notifySessions())
+}
+
+// What the window was last told about, from background re-checks.
+let lastListed = ''
+
+/**
+ * For background triggers (file events, the liveness tick): re-scans, and
+ * tells the window only if the list changed. Every transcript append and
+ * every 10s tick used to make the window re-fetch and re-render the whole
+ * list (and the board re-fetch Linear) even when nothing it shows had moved.
+ */
+const recheckSessions = () => {
+  sessions()
+    .then((list) => {
+      const key = JSON.stringify(list)
+      if (key !== lastListed) {
+        lastListed = key
+        notifySessions()
+      } else sessionsChecked()
+    })
+    .catch(notifySessions)
 }
 
 /** Learns PR state and branches in the background, then tells the renderer to re-read. */
@@ -526,7 +562,7 @@ async function reloadProjectConfig(): Promise<void> {
 let stopWatching: () => void = () => {}
 function startWatching(): void {
   stopWatching()
-  stopWatching = watchSessions(notifySessions)
+  stopWatching = watchSessions(recheckSessions)
 }
 
 function pathsChanged(): void {
@@ -757,6 +793,9 @@ ipcMain.on('open-external', (_e, url: string) => openExternal(url))
 ipcMain.on('ui:active', (_e, id: string | null) => {
   activeSessionId = typeof id === 'string' && UUID_RE.test(id) ? id : null
 })
+ipcMain.on('ui:visibleTerminal', (_e, id: string | null) => {
+  visibleTerminalId = typeof id === 'string' && UUID_RE.test(id) ? id : null
+})
 
 app.on('second-instance', () => showWindow())
 
@@ -764,6 +803,22 @@ app.on('second-instance', () => showWindow())
 // Linear is per project; the connection made before that becomes the current project's.
 void store.adoptLegacyLinear(workspace())
 setTicketKeys(store.linearWorkspace(workspace())?.teamKeys ?? [])
+
+// What the last run read of each transcript: the first scan then reads only
+// what was appended since, instead of every transcript in full.
+const scanCacheFile = () => join(app.getPath('userData'), 'scan-cache.json')
+try {
+  restoreScanCache(readFileSync(scanCacheFile(), 'utf8'))
+} catch {
+  // First run, or unreadable: scan from scratch.
+}
+function saveScanCache(): void {
+  try {
+    writeFileSync(scanCacheFile(), serializeScanCache())
+  } catch {
+    // Only a speed-up; the next launch scans in full.
+  }
+}
 
 app.whenReady().then(() => {
   // About shows "Version 0.1.0", from package.json, without a separate build number.
@@ -780,11 +835,16 @@ app.whenReady().then(() => {
   // A Dock launch doesn't inherit CLAUDE_CONFIG_DIR; ask the login shell, then
   // re-point the watchers if it names another folder.
   void loadShellClaudeDir().then(pathsChanged)
-  const stopActivity = watchActivity(notifySessions)
+  const stopActivity = watchActivity(recheckSessions)
   // A process that dies writes nothing, so no file event reports it. Re-check
   // liveness now and then; the scanner's mtime cache keeps this cheap.
-  const liveness = setInterval(notifySessions, 10_000)
+  const liveness = setInterval(recheckSessions, 10_000)
+  // Saved now and then too, so a crash or force-quit still leaves a recent one.
+  const saveCache = setInterval(saveScanCache, 5 * 60_000)
+  setTimeout(saveScanCache, 30_000).unref()
   app.on('before-quit', () => {
+    clearInterval(saveCache)
+    saveScanCache()
     stopWatching()
     stopActivity.then((stop) => stop())
     clearInterval(liveness)
@@ -802,6 +862,7 @@ app.whenReady().then(() => {
 // app.quit() from a signal closed the window but left the process running.
 for (const sig of ['SIGTERM', 'SIGINT'] as const) {
   process.on(sig, () => {
+    saveScanCache()
     ptys.killAll()
     tool.kill()
     app.exit(0)

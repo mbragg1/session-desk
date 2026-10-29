@@ -26,10 +26,42 @@ function cleanEnv(): Record<string, string> {
 
 // Replay buffer per terminal so a renderer reload can redraw what was on screen.
 const SCROLLBACK_CHARS = 512 * 1024
+// The footer is looked for in this much of the latest output.
+const MODE_TAIL_CHARS = 3000
+
+/**
+ * The last SCROLLBACK_CHARS of output, kept as the chunks that arrived and
+ * joined only when a replay asks for it. Appending to one 512 KB string copied
+ * it whole on every chunk, which was most of the main process's time while
+ * sessions streamed.
+ */
+export class Replay {
+  private chunks: string[] = []
+  private head = 0
+  private length = 0
+
+  push(data: string): void {
+    this.chunks.push(data)
+    this.length += data.length
+    // Drop whole chunks that are entirely older than the limit.
+    while (this.length - this.chunks[this.head].length >= SCROLLBACK_CHARS) this.length -= this.chunks[this.head++].length
+    if (this.head > 1024 && this.head * 2 > this.chunks.length) {
+      this.chunks = this.chunks.slice(this.head)
+      this.head = 0
+    }
+  }
+
+  text(): string {
+    const all = (this.head ? this.chunks.slice(this.head) : this.chunks).join('')
+    return all.length > SCROLLBACK_CHARS ? all.slice(-SCROLLBACK_CHARS) : all
+  }
+}
 
 interface Term {
   proc: pty.IPty
-  buffer: string
+  buffer: Replay
+  /** The latest MODE_TAIL_CHARS of output. */
+  tail: string
   /** The permission mode its footer shows last. */
   mode: PermissionMode | null
 }
@@ -49,14 +81,19 @@ const MODE_PATTERNS: [PermissionMode, RegExp][] = [
 /** The order Shift+Tab steps through (bypass and don't-ask only when the session was started in them). */
 export const MODE_CYCLE: PermissionMode[] = ['auto', 'manual', 'acceptEdits', 'plan']
 
+// Global copies, compiled once: this runs on every output chunk.
+const MODE_PATTERNS_G: [PermissionMode, RegExp][] = MODE_PATTERNS.map(([m, re]) => [m, new RegExp(re.source, 'g')])
+const ESCAPES_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07|\x1b[()][A-Z0-9]/g
+
 /** The mode the most recent footer text names, from raw terminal output; null if none. */
 export function detectMode(raw: string): PermissionMode | null {
-  const text = raw.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07|\x1b[()][A-Z0-9]/g, ' ').replace(/\s+/g, ' ')
+  const text = raw.replace(ESCAPES_RE, ' ').replace(/\s+/g, ' ')
   let best: { mode: PermissionMode; at: number } | null = null
-  for (const [mode, re] of MODE_PATTERNS) {
-    const all = [...text.matchAll(new RegExp(re.source, 'g'))]
-    const last = all[all.length - 1]
-    if (last && (!best || last.index! > best.at)) best = { mode, at: last.index! }
+  for (const [mode, re] of MODE_PATTERNS_G) {
+    re.lastIndex = 0
+    let at = -1
+    for (let m = re.exec(text); m; m = re.exec(text)) at = m.index
+    if (at >= 0 && (!best || at > best.at)) best = { mode, at }
   }
   return best?.mode ?? null
 }
@@ -132,7 +169,7 @@ export class PtyManager {
   start(req: PtyStartRequest, brief?: string, prompt?: string): string {
     if (!UUID_RE.test(req.sessionId)) throw new Error(`not a session id: ${req.sessionId}`)
     const existing = this.terms.get(req.sessionId)
-    if (existing) return existing.buffer
+    if (existing) return existing.buffer.text()
 
     const args = req.resume ? ['--resume', req.sessionId] : ['--session-id', req.sessionId]
     if (brief && (!req.resume || req.kickoff)) args.push('--append-system-prompt', brief)
@@ -147,15 +184,16 @@ export class PtyManager {
     if (prompt && req.kickoff && PLAN_KICKOFFS.has(req.kickoff)) args.push('--permission-mode', 'plan')
     if (prompt) args.push('--', prompt)
     const proc = spawnClaude(args, req.cwd, req.cols, req.rows)
-    const term: Term = { proc, buffer: '', mode: null }
+    const term: Term = { proc, buffer: new Replay(), tail: '', mode: null }
     this.terms.set(req.sessionId, term)
 
     proc.onData((data) => {
-      term.buffer = (term.buffer + data).slice(-SCROLLBACK_CHARS)
+      term.buffer.push(data)
       this.onData(req.sessionId, data)
+      term.tail = data.length >= MODE_TAIL_CHARS ? data.slice(-MODE_TAIL_CHARS) : (term.tail + data).slice(-MODE_TAIL_CHARS)
       // Every chunk: the footer's words arrive split by cursor moves, so a
       // cheap pre-check would miss them; a few thousand characters is cheap.
-      const mode = detectMode(term.buffer.slice(-3000))
+      const mode = detectMode(term.tail)
       if (mode && mode !== term.mode) {
         term.mode = mode
         this.onMode(req.sessionId, mode)
