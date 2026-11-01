@@ -150,6 +150,22 @@ export interface SessionUsage {
   at: number | null
 }
 
+/** Memory a session open here is using: its claude and every process it started (see src/main/memory.ts). */
+export interface SessionMemory {
+  /** Resident bytes, all its processes added up. */
+  bytes: number
+  processes: number
+  /** Its largest programs, same-named processes added up. */
+  top: { name: string; bytes: number; count: number }[]
+}
+
+export interface MemoryReport {
+  sessions: Record<string, SessionMemory>
+  /** Bytes: the warning lines and the Mac's memory. */
+  thresholds: { warn: number; high: number; total: number }
+  at: number
+}
+
 /** A model as Claude Code's catalog describes it (see src/main/modelCatalog.ts). */
 export interface CatalogModel {
   id: string
@@ -622,6 +638,8 @@ export interface DeskApi {
   /** Sends a kickoff turn to a session open here and idle at its prompt; false if it isn't open. */
   ptyKickoff(sessionId: string, ticket: string, kind: Kickoff, prBranch?: PrBranch): Promise<boolean>
   onPtyData(cb: (sessionId: string, data: string) => void): () => void
+  /** Memory per session open here, every few seconds while any is (empty when none is). */
+  onMemory(cb: (report: MemoryReport) => void): () => void
   onPtyExit(cb: (sessionId: string, code: number) => void): () => void
   onSessionsChanged(cb: () => void): () => void
   /** Pin a session to a ticket, overriding detection; null returns it to detection. */

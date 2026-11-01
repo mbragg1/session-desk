@@ -18,6 +18,7 @@ import { errorMessage, folderName, setLinearWorkspaceKey } from './format'
 import { FolderChip } from './components/FolderChip'
 import { ModelPicker } from './components/ModelPicker'
 import { UsageButton } from './components/UsageButton'
+import { MemoryButton, useMemoryReport } from './components/MemoryButton'
 import { NerfguardPanel } from './components/NerfguardPanel'
 import { ModeButton, modeLabel } from './components/ModeButton'
 import { busyReason, readiness, startWork, startWorkNotice } from './startWork'
@@ -225,6 +226,7 @@ export function App() {
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [pinnedIds])
+  const memory = useMemoryReport()
   const runningIds = useMemo(() => new Set(terms.filter((t) => !t.exited).map((t) => t.id)), [terms])
 
   // Opening a session resumes it, unless another process already has it open:
@@ -477,6 +479,7 @@ export function App() {
         notify={notify}
         nav={nav}
         running={runningIds}
+        memory={memory}
         onNav={setNav}
         onNewSession={startDraft}
         homeDir={defaultCwd.replace(/^(\/Users\/[^/]+).*$/, '$1')}
@@ -630,6 +633,7 @@ export function App() {
               blocked={nav.kind === 'session' && selected ? busyReason(readiness(selected, runningIds)) : null}
               onChoose={(choice) => chooseLaunch(activeTermId, choice)}
             />
+            <MemoryButton memory={memory?.sessions[activeTermId]} thresholds={memory?.thresholds} />
             <UsageButton
               sessionId={activeTermId}
               blocked={nav.kind === 'session' && selected ? busyReason(readiness(selected, runningIds)) : null}

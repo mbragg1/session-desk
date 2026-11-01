@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { promises as fs, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron'
 import { CONFIG_NAME, loadProjectConfig, projectConfig, projectConfigStatus, starterConfig, watchProjectConfig } from './projectConfig'
 import { defaultModel, withDefaultContext } from './modelChoice'
 import { findNerfguard, forgetNerfguardStatus, NERFGUARD_ACTIONS, nerfguardStatus } from './nerfguard'
@@ -33,6 +33,8 @@ import { KICKOFFS, kickoffPrompt, ticketBrief, validPrBranch } from './ticketBri
 import { listWorktreesCached, pruneWorktrees, removeWorktree, ticketBranches } from './worktrees'
 import { listBranches, removeBranch } from './branches'
 import { deleteRemoteBranch, listRemoteLeftovers } from './remoteBranches'
+import { watchMemory } from './memory'
+import { formatBytes } from '../shared/memory'
 
 // One state folder for dev and the installed app (whose name differs), so
 // groups, pins and links carry over. Set before the single-instance lock,
@@ -839,6 +841,22 @@ app.whenReady().then(() => {
   // re-point the watchers if it names another folder.
   void loadShellClaudeDir().then(pathsChanged)
   const stopActivity = watchActivity(recheckSessions)
+  // Memory per session open here, its test runners and servers included: macOS
+  // charges all of it to this app, so say which session it is before it runs out.
+  const stopMemory = watchMemory(
+    () => ptys.roots(),
+    (report) => win?.webContents.send('memory:report', report),
+    (id, m) =>
+      void sessions()
+        .then((list) => list.find((s) => s.id === id)?.title)
+        .catch(() => undefined)
+        .then((title) => {
+          const top = m.top[0]
+          const text = `${title ?? id.slice(0, 8)} is using ${formatBytes(m.bytes)} of memory${top ? `, most of it ${top.name} (${formatBytes(top.bytes)})` : ''}`
+          win?.webContents.send('notice', text)
+          if (Notification.isSupported()) new Notification({ title: 'A session is using a lot of memory', body: text }).show()
+        })
+  )
   // A process that dies writes nothing, so no file event reports it. Re-check
   // liveness now and then; the scanner's mtime cache keeps this cheap.
   const liveness = setInterval(recheckSessions, 10_000)
@@ -850,6 +868,7 @@ app.whenReady().then(() => {
     saveScanCache()
     stopWatching()
     stopActivity.then((stop) => stop())
+    stopMemory()
     clearInterval(liveness)
     stopConfigWatch()
     ptys.killAll()

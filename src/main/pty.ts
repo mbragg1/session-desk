@@ -185,6 +185,11 @@ export class PtyManager {
     return new Set([...this.terms.values()].map((t) => t.proc.pid).concat([...this.headless].map((p) => p.pid)))
   }
 
+  /** Session id -> its claude process's pid, for each session running here. */
+  roots(): Map<string, number> {
+    return new Map([...this.terms].map(([id, t]) => [id, t.proc.pid]))
+  }
+
   has(sessionId: string): boolean {
     return this.terms.has(sessionId)
   }

@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
-import type { LinearStatus, NerfguardAction, PrFocus, SessionGroup, SessionSummary } from '../../../shared/types'
+import type { LinearStatus, MemoryReport, NerfguardAction, PrFocus, SessionGroup, SessionSummary } from '../../../shared/types'
+import { formatBytes } from '../../../shared/memory'
+import { memoryTone } from './MemoryButton'
 import { errorMessage, timeAgo } from '../format'
 import { coreSessionEntries, type SessionActionHandlers } from '../sessionActions'
 import { ArtifactIcon, BoardIcon, BranchIcon, WorktreeIcon, ChevronIcon, FolderPlusIcon, LinkIcon, MoreIcon, PlusIcon, SearchIcon } from './icons'
@@ -21,6 +23,8 @@ interface Props {
   groups: SessionGroup[]
   nav: Nav
   running: Set<string>
+  /** Memory per session open here; a row shows it only once it's over the warning line. */
+  memory?: MemoryReport | null
   onNav: (nav: Nav) => void
   /** Starts a new session, in `cwd` when given (a project header's +). */
   onNewSession: (cwd?: string) => void
@@ -136,6 +140,8 @@ export function Sidebar(props: Props) {
     // Activity from the hooks wins; otherwise where the session is open.
     const status =
       s.activity?.state ?? (running.has(s.id) ? 'running' : s.liveElsewhere ? 'elsewhere' : 'idle')
+    const mem = props.memory?.sessions[s.id]
+    const memTone = memoryTone(mem, props.memory?.thresholds)
     const where = running.has(s.id) ? 'here' : s.liveElsewhere ? `in ${s.liveElsewhere.entrypoint}` : ''
     const tooltip = [
       s.title,
@@ -150,6 +156,7 @@ export function Sidebar(props: Props) {
             : status === 'elsewhere'
               ? `open ${where}`
               : '',
+      mem ? `using ${formatBytes(mem.bytes)} of memory` : '',
       timeAgo(s.lastActivity)
     ]
       .filter(Boolean)
@@ -204,6 +211,7 @@ export function Sidebar(props: Props) {
         >
           <span className={`status status-${status}`} />
           <span className="session-name">{s.title}</span>
+          {memTone && mem && <span className={`session-memory ${memTone}`}>{formatBytes(mem.bytes)}</span>}
           {s.tickets[0] && <span className="session-ticket">{s.tickets[0].replace(/^[A-Z][A-Z0-9]*-/, '')}</span>}
           <button
             className="row-more icon-button"

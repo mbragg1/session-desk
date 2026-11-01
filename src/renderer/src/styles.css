@@ -445,6 +445,36 @@ a:hover {
   flex: 1;
 }
 
+/* A session's memory, its test runners and servers included: amber, then red, as it nears the Mac's limit. */
+.memory-button {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.memory-button.warn,
+.session-memory.warn {
+  color: #b8860b;
+}
+
+.memory-button.bad,
+.session-memory.bad {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.memory-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-memory {
+  flex: none;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
 .usage-button {
   display: flex;
   align-items: center;

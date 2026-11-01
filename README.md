@@ -209,6 +209,12 @@ The ring at the right of the footer shows how full the session's context window 
 
 The numbers come from Claude Code's status line input. Sessions this app starts get a status line of the app's own, passed with `--settings` for that session only (your settings never change), which saves that input to `~/.session-desk/usage/` and then runs your own status line, if you have one, so what you see in the terminal stays the same. A session started elsewhere shows only the tokens in its last reply, from its transcript. Claude Code doesn't report the per-model weekly limit, so that one isn't shown.
 
+## Memory
+
+macOS counts every process a session starts as Session Desk: its `claude`, and everything that starts in turn (test runners, dev servers, headless browsers). So when a test run grows to several GB, Activity Monitor and the out-of-memory dialog blame Session Desk. The footer of a session open here shows the memory that session and everything it started are using; click it to see the largest programs, with same-named processes added up ("node vitest × 4"). In the sidebar, a session's row shows the number once it passes 1/6 of the Mac's memory (amber, 4 GB on a 24 GB Mac), and in red past 1/3 (8 GB). Past 1/3 the app also shows a notice and a macOS notification naming the session and its largest program. That happens once each time the session crosses the line; it can happen again after the session drops back below the amber line.
+
+It's read every 5 seconds with one `ps` of every process (about 20–40 ms), only while a session is open here. A process belongs to the session whose `claude` it descends from. A server started in the background whose shell then exited is kept too, by what an earlier read saw of it or by its process group. The figure is resident memory, so memory macOS has compressed or swapped out isn't counted, and under memory pressure it reads low. The app's own processes aren't included; they normally stay under a few hundred MB.
+
 ## NerfGuard
 
 [NerfGuard](https://nerfguard.com) routes Claude Code through a local gateway: `nerfguard enable` sets `ANTHROPIC_BASE_URL` in `~/.claude/settings.json`, and every `claude` reads that, so sessions started here go through it just as terminal ones do. Sessions already running keep their route until they restart.

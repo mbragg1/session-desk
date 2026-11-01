@@ -39,6 +39,7 @@ const api: DeskApi = {
       for (const [id, data] of batch) cb(id, data)
     }),
   onPtyExit: (cb) => subscribe('pty:exit', cb),
+  onMemory: (cb) => subscribe('memory:report', cb),
   onSessionsChanged: (cb) => subscribe('sessions:changed', cb),
   linkSession: (id, ticket) => ipcRenderer.invoke('sessions:link', id, ticket),
   renameSession: (id, name) => ipcRenderer.invoke('sessions:rename', id, name),
