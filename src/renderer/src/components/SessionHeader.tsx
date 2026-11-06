@@ -76,7 +76,13 @@ function RelatedRow({ pr }: { pr: ShownPr }) {
 
 export function PrPanel({ prs, sessionId, focus }: { prs: ShownPr[]; sessionId: string; focus?: PrFocus }) {
   const [showDone, setShowDone] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   useEffect(() => setShowDone(false), [sessionId])
+  // Background refreshes only re-read a PR every few minutes; this re-reads them now.
+  const refresh = () => {
+    setRefreshing(true)
+    window.desk.refreshPrs(prs.map((p) => p.url)).finally(() => setRefreshing(false))
+  }
   const sorted = [...prs].sort((a, b) => prRank(a) - prRank(b))
   // The card's PRs go first, whatever their state: rows grow as CI and deploy
   // state load, so anywhere lower they'd drift out of view.
@@ -88,7 +94,14 @@ export function PrPanel({ prs, sessionId, focus }: { prs: ShownPr[]; sessionId: 
   const done = rest.filter((p) => p.info && p.info.state !== 'OPEN')
   return (
     <section className="panel pr-panel">
-      <h2>Pull requests</h2>
+      <div className="pr-panel-head">
+        <h2>Pull requests</h2>
+        {prs.length > 0 && (
+          <button className="link-button pr-refresh" disabled={refreshing} title="Re-read these PRs from GitHub now" onClick={refresh}>
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        )}
+      </div>
       {prs.length === 0 ? (
         <p className="empty">No PRs from this session or its ticket.</p>
       ) : (
