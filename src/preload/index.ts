@@ -61,6 +61,7 @@ const api: DeskApi = {
   getBoard: () => ipcRenderer.invoke('linear:board'),
   getIssue: (identifier) => ipcRenderer.invoke('linear:issue', identifier),
   requestGreptileReview: (url) => ipcRenderer.invoke('pr:greptile', url),
+  refreshPrs: (urls) => ipcRenderer.invoke('pr:refresh', urls),
   ticketContext: (ticket, prNumbers) => ipcRenderer.invoke('context:get', ticket, prNumbers),
   searchTranscripts: (query) => ipcRenderer.invoke('search:transcripts', query),
   listArtifacts: () => ipcRenderer.invoke('artifacts:list'),

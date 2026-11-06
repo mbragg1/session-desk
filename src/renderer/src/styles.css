@@ -1821,6 +1821,24 @@ a:hover {
   font-size: 12px;
 }
 
+/* The panel's title, with a Refresh that re-reads its PRs from GitHub. */
+.pr-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pr-refresh {
+  font-size: 12px;
+  flex: none;
+}
+
+.pr-refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* Ticket context: evidence folders and memory notes */
 
 .ticket-context {

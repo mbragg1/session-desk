@@ -123,11 +123,12 @@ export async function requestGreptileReview(url: string): Promise<void> {
 
 /**
  * Fetches GitHub state for any PRs not cached (or open and stale).
+ * `force` re-reads them all now, whatever their age (a manual refresh).
  * Resolves true if anything new was learned.
  */
-export async function refreshPrInfo(prs: PrLink[]): Promise<boolean> {
+export async function refreshPrInfo(prs: PrLink[], force = false): Promise<boolean> {
   const todo = [...new Map(prs.map((p) => [p.url, p])).values()].filter(
-    (p) => stale(p.url) && !inFlight.has(p.url)
+    (p) => (force || stale(p.url)) && !inFlight.has(p.url)
   )
   if (todo.length === 0) return false
   todo.forEach((p) => inFlight.add(p.url))

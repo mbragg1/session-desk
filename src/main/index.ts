@@ -10,7 +10,7 @@ import { readModelCatalog } from './modelCatalog'
 import { installStatusLine, readUsage } from './usage'
 import type { Column, Kickoff, LinearStatus, PermissionMode, PtyStartRequest, RenameResult, SessionSummary, Settings, TicketBranch } from '../shared/types'
 import { COLUMNS, EFFORT_CHOICES, NERFGUARD_INSTALL_COMMAND } from '../shared/types'
-import { refreshPrInfo, requestGreptileReview, withInfo } from './github'
+import { parsePrUrl, refreshPrInfo, requestGreptileReview, withInfo } from './github'
 import { Indicators } from './indicators'
 import { fetchBoard, fetchIssue, invalidate, linearStatus, moveIssue, refreshPrTickets, resetLinear } from './linear'
 import { applyLinks, buildBoard } from './link'
@@ -426,6 +426,22 @@ ipcMain.handle('context:open', async (_e, path: string) => {
 })
 ipcMain.handle('pr:greptile', async (_e, url: string) => {
   await requestGreptileReview(String(url))
+  notifySessions()
+})
+// The session view's Refresh: re-reads these PRs from GitHub now (cache and
+// the local-checkout comparison alike), then tells the window once.
+ipcMain.handle('pr:refresh', async (_e, urls: unknown) => {
+  const prs = (Array.isArray(urls) ? urls.slice(0, 50) : []).flatMap((u) => {
+    const pr = typeof u === 'string' ? parsePrUrl(u) : null
+    return pr ? [pr] : []
+  })
+  if (prs.length === 0) return
+  await refreshPrInfo(prs, true)
+  const fresh = prs.map(withInfo)
+  const ws = workspace()
+  if (ws) await refreshLocalSync(ws, fresh, true)
+  // A scan that started before the refresh would still be served for a moment.
+  recentScan = null
   notifySessions()
 })
 ipcMain.handle('worktrees:list', () => {

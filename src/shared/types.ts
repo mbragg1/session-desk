@@ -680,6 +680,8 @@ export interface DeskApi {
   openContextPath(path: string): Promise<void>
   /** Posts `@greptileai review` on an open PR. */
   requestGreptileReview(prUrl: string): Promise<void>
+  /** Re-reads these PRs from GitHub now (checks, reviews, local sync), not on their usual schedule. */
+  refreshPrs(prUrls: string[]): Promise<void>
   moveCard(identifier: string, column: Column): Promise<Board>
 
   openExternal(url: string): void

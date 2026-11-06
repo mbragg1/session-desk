@@ -59,6 +59,13 @@ describe('PrPanel focus (opened from a card through another session)', () => {
 })
 })
 
+describe('PrPanel refresh', () => {
+  it('offers a Refresh while there are PRs to re-read, and none otherwise', () => {
+    expect(renderToStaticMarkup(<PrPanel prs={[pr(1)]} sessionId="s" />)).toContain('Refresh</button>')
+    expect(renderToStaticMarkup(<PrPanel prs={[]} sessionId="s" />)).not.toContain('pr-refresh')
+  })
+})
+
 describe('related PRs in the session view', () => {
   const banner: PrLink = { ...pr(9207), info: { title: 'Remove old banner', state: 'MERGED', draft: false, headRef: 'sam/remove-banner', mentions: [] } }
 
