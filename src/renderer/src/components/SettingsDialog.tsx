@@ -60,7 +60,7 @@ export function SettingsDialog({ linear, onManageLinear, onClose, notify }: Prop
       <div className="modal modal-wide settings" role="dialog" aria-label="Settings" onMouseDown={(e) => e.stopPropagation()}>
         <h1>Settings</h1>
         {s && (
-          <>
+          <div className="settings-body">
             <section className="setting">
               <div className="setting-label">Project folder</div>
               <div className="setting-value">{s.workspace ? shortPath(s.workspace) : 'Not chosen yet'}</div>
@@ -172,7 +172,7 @@ export function SettingsDialog({ linear, onManageLinear, onClose, notify }: Prop
                 </button>
               </div>
             </section>
-          </>
+          </div>
         )}
         <div className="modal-actions">
           <span className="app-version muted">Session Desk {__APP_VERSION__}</span>

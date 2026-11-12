@@ -1153,6 +1153,10 @@ a:hover {
   border-radius: 12px;
   padding: 20px 22px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  /* Never taller than the window: content that doesn't fit scrolls instead
+     of spilling past the top and bottom edges. */
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
 }
 
 .modal h1 {
@@ -2095,6 +2099,26 @@ mark.hl {
 }
 
 /* Settings */
+
+/* The title and the Done row stay put; only the settings list scrolls. */
+.modal.settings {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.settings-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings > h1,
+.settings > .modal-actions {
+  flex: none;
+}
 
 .settings .setting {
   padding: 12px 0;
