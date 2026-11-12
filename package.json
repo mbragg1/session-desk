@@ -1,6 +1,6 @@
 {
   "name": "session-desk",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Claude Code sessions grouped with Linear tickets and PRs",
   "main": "out/main/index.js",
@@ -49,7 +49,9 @@
     },
     "files": [
       "out/**",
-      "package.json"
+      "package.json",
+      "!node_modules/node-pty/prebuilds/darwin-x64/**",
+      "!node_modules/node-pty/prebuilds/win32-*/**"
     ],
     "asarUnpack": [
       "node_modules/node-pty/**"
